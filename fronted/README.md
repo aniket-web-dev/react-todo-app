@@ -1,6 +1,8 @@
-# Getting Started with Create React App
+# Todo-app
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+![todo-app](https://github.com/user-attachments/assets/3b7a7d20-4987-4395-9192-607fc2741f86)
 
 ## Available Scripts
 
