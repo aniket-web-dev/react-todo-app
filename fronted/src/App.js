@@ -1,102 +1,89 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./App.css";
 import { FiEdit, FiTrash2, FiCheck, FiPlus } from "react-icons/fi";
+import axios from "axios";
 
+const API_URL = "http://localhost:5000/api/todos";
 
 function App() {
-  const initialState = [{
-    text: "Learn Python",
-    completed: true
-  }, {
-    text: "Learn Java",
-    completed: false
-  }, {
-    text: "Learn React",
-    completed: true
-  }, {
-    text: "Take shower",
-    completed: false
-  }, {
-    text: "Cook food",
-    completed: false
-  },{
-    text: "GYM",
-    completed: false
-  }
-];
   const [task, setTask] = useState("");
-  const [todos, setTodos] = useState(initialState);
-  const [editingIndex, setEditingIndex] = useState(null);
+  const [todos, setTodos] = useState([]);
+  const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+
+  // Fetch tasks from backend
+  useEffect(() => {
+    axios.get(API_URL)
+      .then(res => setTodos(res.data))
+      .catch(err => console.error("Error fetching todos:", err));
+  }, []);
 
   const handleAddTask = () => {
     const trimmed = task.trim();
     if (!trimmed) return;
 
-    const isDuplicate = todos.some(
-      (todo) => todo.text.toLowerCase() === trimmed.toLowerCase()
-    );
-    if (isDuplicate) {
-      alert("⚠️ Task already exists!");
-      return;
-    }
-
-    setTodos([...todos, { text: trimmed, completed: false }]);
-    setTask("");
+    axios.post(API_URL, { text: trimmed })
+      .then(res => {
+        setTodos([res.data, ...todos]);
+        setTask("");
+      })
+      .catch(err => {
+        if (err.response?.data?.error) {
+          alert("⚠️ " + err.response.data.error);
+        } else {
+          console.error(err);
+        }
+      });
   };
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter") handleAddTask();
   };
 
-  const toggleComplete = (index) => {
-    const updated = [...todos];
-    updated[index].completed = !updated[index].completed;
-    setTodos(updated);
+  const toggleComplete = (todo) => {
+    axios.put(`${API_URL}/${todo._id}`, {
+      text: todo.text,
+      completed: !todo.completed
+    }).then(res => {
+      setTodos(todos.map(t => (t._id === todo._id ? res.data : t)));
+    });
   };
 
-  const deleteTask = (index) => {
-    setTodos(todos.filter((_, i) => i !== index));
+  const deleteTask = (id) => {
+    axios.delete(`${API_URL}/${id}`)
+      .then(() => setTodos(todos.filter(t => t._id !== id)));
   };
 
-  const startEditing = (index) => {
-    setEditingIndex(index);
-    setEditText(todos[index].text);
+  const startEditing = (todo) => {
+    setEditingId(todo._id);
+    setEditText(todo.text);
   };
 
-  const saveEdit = (index) => {
+  const saveEdit = (id) => {
     const trimmed = editText.trim();
     if (!trimmed) return;
 
-    // If unchanged, cancel edit
-    if (trimmed === todos[index].text) {
-      setEditingIndex(null);
+    axios.put(`${API_URL}/${id}`, {
+      text: trimmed
+    })
+    .then(res => {
+      setTodos(todos.map(t => (t._id === id ? res.data : t)));
+      setEditingId(null);
       setEditText("");
-      return;
-    }
-
-    // Check for duplicate (excluding the current task)
-    const isDuplicate = todos.some(
-      (todo, i) =>
-        i !== index && todo.text.toLowerCase() === trimmed.toLowerCase()
-    );
-    if (isDuplicate) {
-      alert("⚠️ Another task with this name already exists!");
-      return;
-    }
-
-    const updated = [...todos];
-    updated[index].text = trimmed;
-    setTodos(updated);
-    setEditingIndex(null);
-    setEditText("");
+    })
+    .catch(err => {
+      if (err.response?.data?.error) {
+        alert("⚠️ " + err.response.data.error);
+      } else {
+        console.error(err);
+      }
+    });
   };
 
   return (
     <div className="container">
       <h1>📝 Aniket To-Do List</h1>
 
-      {/* Input and add button */}
       <div className="input-group">
         <input
           type="text"
@@ -109,30 +96,26 @@ function App() {
         <button className="add-btn" onClick={handleAddTask} title="Add Task">
           <FiPlus />
         </button>
-
       </div>
 
-      {/* Tasks */}
       <ul className="todo-list">
-        {todos.map((todo, index) => (
-          <li className="todo-item" key={index}>
+        {todos.map((todo) => (
+          <li className="todo-item" key={todo._id}>
             <input
               type="checkbox"
               checked={todo.completed}
-              onChange={() => toggleComplete(index)}
+              onChange={() => toggleComplete(todo)}
             />
 
-            {editingIndex === index ? (
+            {editingId === todo._id ? (
               <input
                 type="text"
                 className="edit-input"
                 value={editText}
                 autoFocus
                 onChange={(e) => setEditText(e.target.value)}
-                onBlur={() => saveEdit(index)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveEdit(index);
-                }}
+                onBlur={() => saveEdit(todo._id)}
+                onKeyDown={(e) => e.key === "Enter" && saveEdit(todo._id)}
               />
             ) : (
               <span className={todo.completed ? "done" : ""}>
@@ -141,16 +124,16 @@ function App() {
             )}
 
             <div className="actions">
-              {editingIndex === index ? (
-                <button title="Save" onClick={() => saveEdit(index)}>
+              {editingId === todo._id ? (
+                <button title="Save" onClick={() => saveEdit(todo._id)}>
                   <FiCheck />
                 </button>
               ) : (
-                <button title="Edit" onClick={() => startEditing(index)}>
+                <button title="Edit" onClick={() => startEditing(todo)}>
                   <FiEdit />
                 </button>
               )}
-              <button title="Delete" onClick={() => deleteTask(index)}>
+              <button title="Delete" onClick={() => deleteTask(todo._id)}>
                 <FiTrash2 />
               </button>
             </div>
